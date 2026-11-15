@@ -1,0 +1,83 @@
+# Model names are set once here and shared by the API and the model-pull job.
+x-models: &models
+  AGENT_MODEL: ${AGENT_MODEL:-qwen3:1.7b}
+  DECISION_MODEL: ${DECISION_MODEL:-d3:2b}
+
+x-ollama-image: &ollama-image ollama/ollama:0.40.16
+
+services:
+  api:
+    build: .
+    environment:
+      <<: *models
+      OLLAMA_BASE_URL: http://ollama:11434
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.8}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      ollama-init:
+        condition: service_completed_successfully
+      mailhog:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8000/api/v1/health", timeout=10)
+      interval: 15s
+      timeout: 15s
+      retries: 5
+      start_period: 20s
+      start_interval: 1s
+    restart: unless-stopped
+
+  ollama:
+    image: *ollama-image
+    environment:
+      # Keep both models in memory so no request pays the load time.
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_MAX_LOADED_MODELS: "2"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # One-shot job: downloads the model weights (first start only) and loads them.
+  # The API waits for it, so `docker compose up -d` returns with the stack ready.
+  ollama-init:
+    image: *ollama-image
+    environment:
+      <<: *models
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        ollama pull "$$AGENT_MODEL"
+        ollama pull "$$DECISION_MODEL"
+        ollama run "$$AGENT_MODEL" ""
+        echo "warm-up" | ollama run "$$DECISION_MODEL" --ask "Is this a greeting?"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "${MAILHOG_PORT:-8025}:8025" # web UI and API; SMTP (1025) stays internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
