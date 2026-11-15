@@ -4,6 +4,7 @@ from http import HTTPStatus
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 
 from app.schemas import Problem
 
@@ -14,18 +15,26 @@ class AppError(Exception):
     """Base for failures we report to the client with a specific HTTP status."""
 
     status = HTTPStatus.INTERNAL_SERVER_ERROR
+    # Sent to the client; the exception message (hosts, library errors) is only logged.
+    detail = "Unexpected server error."
 
 
 class MailDeliveryError(AppError):
     status = HTTPStatus.BAD_GATEWAY
+    detail = "The mail server did not accept the e-mail."
 
 
 class ModelError(AppError):
     status = HTTPStatus.SERVICE_UNAVAILABLE
+    detail = "A model is unavailable or gave no usable answer; nothing was sent."
+
+
+def _request_id(request: Request) -> str:
+    return getattr(request.state, "request_id", "unknown")
 
 
 def problem_response(request: Request, status: HTTPStatus, detail: str) -> JSONResponse:
-    request_id = getattr(request.state, "request_id", "unknown")
+    request_id = _request_id(request)
     body = Problem(title=status.phrase, status=status, detail=detail, request_id=request_id)
     return JSONResponse(
         body.model_dump(),
@@ -38,8 +47,14 @@ def problem_response(request: Request, status: HTTPStatus, detail: str) -> JSONR
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error(request: Request, exc: AppError) -> JSONResponse:
-        logger.error("%s: %s", type(exc).__name__, exc)
-        return problem_response(request, exc.status, str(exc))
+        logger.error("%s: %s request_id=%s", type(exc).__name__, exc, _request_id(request))
+        return problem_response(request, exc.status, exc.detail)
+
+    @app.exception_handler(HTTPException)  # 404/405 raised by the router
+    async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
+        response = problem_response(request, HTTPStatus(exc.status_code), str(exc.detail))
+        response.headers.update(exc.headers or {})  # e.g. Allow on 405
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -51,7 +66,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled error", exc_info=exc)
+        logger.exception("Unhandled error request_id=%s", _request_id(request), exc_info=exc)
         return problem_response(
             request,
             HTTPStatus.INTERNAL_SERVER_ERROR,

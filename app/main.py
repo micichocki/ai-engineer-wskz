@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         model=settings.agent_model,
         base_url=settings.ollama_base_url,
         temperature=0,
+        num_predict=128,  # a send_email call is ~30 tokens; stops a model stuck repeating itself
         reasoning=False,  # one enum argument needs no thinking; keeps CPU latency low
         client_kwargs={"timeout": settings.model_timeout_seconds},
     )

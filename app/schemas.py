@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 
 from app.departments import Department
 
@@ -10,6 +10,15 @@ class MessageRequest(BaseModel):
     message: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
     ] = Field(description="Free-text message to route.")
+
+    @field_validator("email")
+    @classmethod
+    def _ascii_only(cls, value: str) -> str:
+        # shortcut: the mailer sends plain ASCII headers, so SMTPUTF8/IDN addresses are
+        # rejected; switch to an SMTPUTF8 session if such senders must be supported.
+        if not value.isascii():
+            raise ValueError("non-ASCII e-mail addresses are not supported")
+        return value
 
     model_config = {
         "json_schema_extra": {

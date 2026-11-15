@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage
@@ -105,8 +107,21 @@ async def test_decision_is_attributed_to_the_agent(outbox, to, confidence):
             AIMessage(content="", tool_calls=[tool_call("kadry@example.com")]),
             ModelError("d3 is not loaded"),
         ),
+        (
+            AIMessage(
+                content="",
+                tool_calls=[{"name": "send_mail", "args": {"to": "it@example.com"}, "id": "x"}],
+            ),
+            Decision(Department.IT, 0.9),
+        ),
     ],
-    ids=["agent-down", "no-tool-call", "address-outside-the-list", "decision-model-down"],
+    ids=[
+        "agent-down",
+        "no-tool-call",
+        "address-outside-the-list",
+        "decision-model-down",
+        "wrong-tool-name",
+    ],
 )
 async def test_model_failure_is_an_error_and_sends_nothing(outbox, response, decision):
     with pytest.raises(ModelError):
@@ -126,3 +141,18 @@ async def test_mail_delivery_failure_is_not_swallowed(monkeypatch):
             AIMessage(content="", tool_calls=[tool_call("it@example.com")]),
             Decision(Department.IT, 0.9),
         )
+
+
+async def test_agent_call_has_a_total_time_limit(outbox):
+    class SlowChatModel(FakeChatModel):
+        async def ainvoke(self, *args, **kwargs):
+            await asyncio.sleep(5)
+
+    settings = Settings(_env_file=None, model_timeout_seconds=0.01)
+    graph = build_graph(
+        settings, SlowChatModel(responses=[]), FakeDecisionModel(Decision(Department.IT, 0.9))
+    )
+
+    with pytest.raises(ModelError):
+        await graph.ainvoke(REQUEST)
+    assert outbox == []

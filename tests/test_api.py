@@ -1,8 +1,13 @@
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import httpx
 import pytest
 
+from app import mailer
+from app.config import Settings
 from app.departments import Department
-from app.errors import MailDeliveryError
+from app.errors import MailDeliveryError, ModelError
 from app.main import create_app
 
 BODY = {"email": "jan.nowak@example.com", "message": "Nie działa mi komputer"}
@@ -57,7 +62,13 @@ async def test_routes_message_and_reports_recipient(client, graph):
 
 @pytest.mark.parametrize(
     "body",
-    [{"email": "not-an-email", "message": "hi"}, {"email": "jan@example.com", "message": "  "}, {}],
+    [
+        {"email": "not-an-email", "message": "hi"},
+        {"email": "jan@example.com", "message": "  "},
+        {"email": "jan@żółw.pl", "message": "hi"},
+        {"email": "żółw@example.com", "message": "hi"},
+        {},
+    ],
 )
 async def test_invalid_input_is_a_problem_response(client, graph, body):
     response = await client.post("/api/v1/messages", json=body)
@@ -73,7 +84,50 @@ async def test_mail_failure_is_reported(client, graph):
     failed = await client.post("/api/v1/messages", json=BODY)
 
     assert failed.status_code == 502
-    assert failed.json()["detail"] == "smtp down"
+    assert failed.json()["detail"] == MailDeliveryError.detail
+
+
+async def test_model_failure_hides_internal_details(client, graph, caplog):
+    graph.error = ModelError("connect to http://ollama:11434 refused")
+    response = await client.post("/api/v1/messages", json=BODY)
+
+    assert response.status_code == 503
+    assert "ollama" not in response.text
+    assert "ollama:11434" in caplog.text
+
+
+async def test_errors_are_logged_with_the_request_id(client, graph, caplog):
+    for graph.error in (MailDeliveryError("smtp down"), RuntimeError("boom")):
+        response = await client.post("/api/v1/messages", json=BODY)
+        assert response.json()["request_id"] in caplog.records[-1].getMessage()
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "status"), [("GET", "/nope", 404), ("GET", "/api/v1/messages", 405)]
+)
+async def test_unknown_path_and_method_are_problem_responses(client, method, path, status):
+    response = await client.request(method, path)
+
+    assert response.status_code == status
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.json()["request_id"] == response.headers["X-Request-ID"]
+    if status == 405:
+        assert response.headers["Allow"] == "POST"
+
+
+async def test_health_accepts_untagged_model_names(client, monkeypatch):
+    class FakeOllama:
+        async def list(self):
+            names = ("qwen3:latest", "d3:2b")
+            return SimpleNamespace(models=[SimpleNamespace(model=name) for name in names])
+
+    client._transport.app.state.settings = Settings(_env_file=None, agent_model="qwen3")
+    client._transport.app.state.ollama = FakeOllama()
+    monkeypatch.setattr(mailer, "connect", lambda settings: MagicMock())
+
+    response = await client.get("/api/v1/health")
+
+    assert response.json()["components"]["ollama"] == "ok", response.text
 
 
 async def test_unexpected_error_hides_details(client, graph):

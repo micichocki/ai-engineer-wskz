@@ -14,9 +14,8 @@ docker compose up -d
 ```
 
 The first start downloads the model weights (about 4.6 GB), so it takes a few minutes. The
-command returns once the models are downloaded and loaded and the API container is started; the
-API accepts requests a second or two later. To block until it reports healthy, use
-`docker compose up -d --wait`.
+command returns once the models are downloaded and loaded and the API reports healthy, so the
+stack accepts requests as soon as you get the prompt back.
 
 | What | Address |
 |---|---|
@@ -64,6 +63,7 @@ client ─► api (FastAPI) ─► LangGraph
 | `api` | built from `python:3.12-slim` | FastAPI app with the agent |
 | `ollama` | `ollama/ollama` | serves both models on CPU (or GPU) |
 | `ollama-init` | `ollama/ollama` | one-shot job: pulls and loads the models, then exits |
+| `ready` | `ollama/ollama` | one-shot gate: makes `up -d` wait until the API is healthy |
 | `mailhog` | `mailhog/mailhog` | catches the e-mails, web UI on port 8025 |
 
 ## Architecture decisions
@@ -86,7 +86,8 @@ is used only when the models choose it. Only one e-mail is sent per request. The
 the department itself (`agent`).
 
 **Errors are reported in one format.** Failures return `application/problem+json` with `title`,
-`status`, `detail` and a `request_id` that also appears in the logs and the `X-Request-ID` header.
+`status`, a fixed `detail` and a `request_id` that also appears in the logs (with the real cause)
+and the `X-Request-ID` header.
 
 | Status | Meaning |
 |---|---|
@@ -101,7 +102,7 @@ by both models. `kadry` covers personnel administration (leave, payroll, contrac
 covers things that are broken; `it` covers access, systems and infrastructure requests.
 
 **Readiness.** The API container starts only after the model job has finished and MailHog is
-healthy. Models stay loaded in memory, so no request pays the model load time.
+healthy, and the `ready` job holds `docker compose up -d` until the API health check passes. Models stay loaded in memory, so no request pays the model load time.
 
 ## Project layout
 

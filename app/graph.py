@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.language_models import BaseChatModel
@@ -85,10 +86,13 @@ def build_graph(
             HumanMessage(f"Employee message:\n{state['message']}\n\n{hint}"),
         ]
         try:
-            response = await agent_model.ainvoke(prompt)
+            # The HTTP timeout only limits the gap between streamed chunks; this caps the total.
+            async with asyncio.timeout(settings.model_timeout_seconds):
+                response = await agent_model.ainvoke(prompt)
         except Exception as exc:  # langchain/ollama/httpx raise unrelated types
             raise ModelError(f"Agent model {settings.agent_model!r} failed: {exc}") from exc
-        if not response.tool_calls:
+        # ToolNode answers an unknown tool name with a message instead of raising.
+        if not response.tool_calls or response.tool_calls[0]["name"] != send_email.name:
             raise ModelError(f"Agent model {settings.agent_model!r} made no send_email tool call.")
         # One request sends one e-mail, even if the model emits several tool calls.
         response.tool_calls = response.tool_calls[:1]

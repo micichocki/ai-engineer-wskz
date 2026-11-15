@@ -1,16 +1,17 @@
 import asyncio
-import smtplib
 
 from fastapi import APIRouter, Request, Response
 
+from app import mailer
+from app.errors import MailDeliveryError, ModelError
 from app.schemas import HealthResponse, MessageRequest, Problem, RoutingResponse
 
 router = APIRouter(prefix="/api/v1")
 
 _ERRORS = {
     422: "Invalid input.",
-    502: "The mail server did not accept the e-mail.",
-    503: "A model is unavailable or gave no usable answer; nothing was sent.",
+    MailDeliveryError.status: MailDeliveryError.detail,
+    ModelError.status: ModelError.detail,
 }
 
 
@@ -46,14 +47,17 @@ async def health(request: Request, response: Response) -> HealthResponse:
 
     async def models() -> None:
         available = {model.model for model in (await state.ollama.list()).models}
-        missing = {settings.agent_model, settings.decision_model} - available
+        # Ollama lists an untagged name as name:latest.
+        wanted = {
+            name if ":" in name.rpartition("/")[2] else f"{name}:latest"
+            for name in (settings.agent_model, settings.decision_model)
+        }
+        missing = wanted - available
         if missing:
             raise RuntimeError(f"models not pulled: {', '.join(sorted(missing))}")
 
     def smtp() -> None:
-        with smtplib.SMTP(
-            settings.smtp_host, settings.smtp_port, timeout=settings.smtp_timeout_seconds
-        ) as connection:
+        with mailer.connect(settings) as connection:
             connection.noop()
 
     async def check(probe) -> str:
