@@ -46,16 +46,19 @@ class FailingChatModel(FakeChatModel):
         raise RuntimeError("ollama is down")
 
 
-async def run(response: AIMessage | FakeChatModel, decision: Decision | Exception) -> dict:
+UNUSED = ModelError("the other mode's model must not be called")
+
+
+async def run(response: AIMessage | FakeChatModel, decision: Decision | Exception = UNUSED) -> dict:
+    """Agent mode unless a decision is given; the unused model fails if it is called."""
+    mode = "agent" if decision is UNUSED else "decision"
+    settings = Settings(_env_file=None, router_mode=mode)
     chat = response if isinstance(response, FakeChatModel) else FakeChatModel(responses=[response])
-    return await build_graph(SETTINGS, chat, FakeDecisionModel(decision)).ainvoke(REQUEST)
+    return await build_graph(settings, chat, FakeDecisionModel(decision)).ainvoke(REQUEST)
 
 
 async def test_agent_tool_call_sends_original_message_with_reply_to(outbox):
-    state = await run(
-        AIMessage(content="", tool_calls=[tool_call("help-desk@example.com")]),
-        Decision(Department.HELP_DESK, 0.95),
-    )
+    state = await run(AIMessage(content="", tool_calls=[tool_call("help-desk@example.com")]))
 
     assert outbox == [
         {
@@ -65,6 +68,17 @@ async def test_agent_tool_call_sends_original_message_with_reply_to(outbox):
         }
     ]
     assert state["sent_to"] is Department.HELP_DESK
+    assert state["decided_by"] == "agent"
+    assert "confidence" not in state
+
+
+async def test_decision_mode_sends_through_the_same_tool_without_the_llm(outbox):
+    state = await run(FailingChatModel(responses=[]), Decision(Department.KADRY, 0.95))
+
+    assert outbox == [
+        {"to": Department.KADRY, "reply_to": "jan.nowak@example.com", "body": REQUEST["message"]}
+    ]
+    assert state["sent_to"] is Department.KADRY
     assert state["decided_by"] == "decision_model"
     assert state["confidence"] == 0.95
 
@@ -74,35 +88,18 @@ async def test_only_one_email_is_sent_for_several_tool_calls(outbox):
         AIMessage(
             content="",
             tool_calls=[tool_call("it@example.com", "a"), tool_call("kadry@example.com", "b")],
-        ),
-        Decision(Department.IT, 0.9),
+        )
     )
 
     assert [mail["to"] for mail in outbox] == [Department.IT]
 
 
 @pytest.mark.parametrize(
-    ("to", "confidence"),
-    [("it@example.com", 0.4), ("kadry@example.com", 0.95)],
-    ids=["low-confidence", "overrides-suggestion"],
-)
-async def test_decision_is_attributed_to_the_agent(outbox, to, confidence):
-    state = await run(
-        AIMessage(content="", tool_calls=[tool_call(to)]), Decision(Department.IT, confidence)
-    )
-
-    assert state["decided_by"] == "agent"
-
-
-@pytest.mark.parametrize(
     ("response", "decision"),
     [
-        (FailingChatModel(responses=[]), Decision(Department.IT, 0.9)),
-        (AIMessage(content="This is for the help desk."), Decision(Department.IT, 0.9)),
-        (
-            AIMessage(content="", tool_calls=[tool_call("ceo@example.com")]),
-            Decision(Department.IT, 0.9),
-        ),
+        (FailingChatModel(responses=[]), UNUSED),
+        (AIMessage(content="This is for the help desk."), UNUSED),
+        (AIMessage(content="", tool_calls=[tool_call("ceo@example.com")]), UNUSED),
         (
             AIMessage(content="", tool_calls=[tool_call("kadry@example.com")]),
             ModelError("d3 is not loaded"),
@@ -112,7 +109,7 @@ async def test_decision_is_attributed_to_the_agent(outbox, to, confidence):
                 content="",
                 tool_calls=[{"name": "send_mail", "args": {"to": "it@example.com"}, "id": "x"}],
             ),
-            Decision(Department.IT, 0.9),
+            UNUSED,
         ),
     ],
     ids=[
@@ -137,10 +134,7 @@ async def test_mail_delivery_failure_is_not_swallowed(monkeypatch):
     monkeypatch.setattr(mailer, "send_email", broken)
 
     with pytest.raises(MailDeliveryError, match="smtp down"):
-        await run(
-            AIMessage(content="", tool_calls=[tool_call("it@example.com")]),
-            Decision(Department.IT, 0.9),
-        )
+        await run(AIMessage(content="", tool_calls=[tool_call("it@example.com")]))
 
 
 async def test_agent_call_has_a_total_time_limit(outbox):
@@ -149,9 +143,7 @@ async def test_agent_call_has_a_total_time_limit(outbox):
             await asyncio.sleep(5)
 
     settings = Settings(_env_file=None, model_timeout_seconds=0.01)
-    graph = build_graph(
-        settings, SlowChatModel(responses=[]), FakeDecisionModel(Decision(Department.IT, 0.9))
-    )
+    graph = build_graph(settings, SlowChatModel(responses=[]), FakeDecisionModel(UNUSED))
 
     with pytest.raises(ModelError):
         await graph.ainvoke(REQUEST)

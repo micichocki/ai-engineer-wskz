@@ -22,10 +22,12 @@ def test_every_department_has_a_description():
 
 def test_settings_read_environment(monkeypatch):
     monkeypatch.setenv("AGENT_MODEL", "qwen3:4b")
-    assert Settings(_env_file=None).agent_model == "qwen3:4b"
+    assert Settings(_env_file=None).model == "qwen3:4b"
+    monkeypatch.setenv("ROUTER_MODE", "decision")
+    assert Settings(_env_file=None).model == "d3:2b"
 
 
-def test_settings_reject_invalid_threshold(monkeypatch):
-    monkeypatch.setenv("CONFIDENCE_THRESHOLD", "1.5")
+def test_settings_reject_unknown_mode(monkeypatch):
+    monkeypatch.setenv("ROUTER_MODE", "hybrid")
     with pytest.raises(ValidationError):
         Settings(_env_file=None)

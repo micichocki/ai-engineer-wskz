@@ -1,5 +1,7 @@
-# Model names are set once here and shared by the API and the model-pull job.
+# Mode and model names are set once here and shared by the API and the model-pull job.
+# ROUTER_MODE: agent (LLM tool call, the default) or decision (decision model, no LLM).
 x-models: &models
+  ROUTER_MODE: ${ROUTER_MODE:-agent}
   AGENT_MODEL: ${AGENT_MODEL:-qwen3:1.7b}
   DECISION_MODEL: ${DECISION_MODEL:-d3:2b}
 
@@ -13,7 +15,6 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
-      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.8}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -49,7 +50,7 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # One-shot job: downloads the model weights (first start only) and loads them.
+  # One-shot job: downloads the selected mode's model (first start only) and loads it.
   # The API waits for it, so `docker compose up -d` returns with the stack ready.
   ollama-init:
     image: *ollama-image
@@ -59,10 +60,13 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
-        ollama pull "$$AGENT_MODEL"
-        ollama pull "$$DECISION_MODEL"
-        ollama run "$$AGENT_MODEL" ""
-        echo "warm-up" | ollama run "$$DECISION_MODEL" --ask "Is this a greeting?"
+        if [ "$$ROUTER_MODE" = decision ]; then
+          ollama pull "$$DECISION_MODEL"
+          echo "warm-up" | ollama run "$$DECISION_MODEL" --ask "Is this a greeting?"
+        else
+          ollama pull "$$AGENT_MODEL"
+          ollama run "$$AGENT_MODEL" ""
+        fi
     depends_on:
       ollama:
         condition: service_healthy

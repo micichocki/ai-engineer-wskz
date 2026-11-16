@@ -27,7 +27,6 @@ class FakeGraph:
         return {
             "sent_to": Department.HELP_DESK,
             "decided_by": "decision_model",
-            "suggestion": Department.HELP_DESK,
             "confidence": 0.95,
         }
 
@@ -53,7 +52,6 @@ async def test_routes_message_and_reports_recipient(client, graph):
     assert response.json() == {
         "recipient": "help-desk@example.com",
         "decided_by": "decision_model",
-        "suggested_department": "help-desk@example.com",
         "confidence": 0.95,
     }
     assert graph.calls == [BODY]

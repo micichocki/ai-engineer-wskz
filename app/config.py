@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,17 +10,23 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # "agent": the LLM picks the department and calls send_email.
+    # "decision": the decision model picks it and code makes the same call.
+    router_mode: Literal["agent", "decision"] = "agent"
     ollama_base_url: str = "http://ollama:11434"
     agent_model: str = "qwen3:1.7b"
     decision_model: str = "d3:2b"
-    # Below this confidence the agent is told to decide on its own.
-    confidence_threshold: float = Field(default=0.8, ge=0, le=1)
     model_timeout_seconds: float = Field(default=120, gt=0)
 
     smtp_host: str = "mailhog"
     smtp_port: int = 1025
     smtp_timeout_seconds: float = Field(default=10, gt=0)
     mail_from: str = "message-router@example.com"
+
+    @property
+    def model(self) -> str:
+        """The one model the selected mode uses."""
+        return self.agent_model if self.router_mode == "agent" else self.decision_model
 
 
 @lru_cache

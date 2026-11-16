@@ -45,8 +45,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="AI message router",
         description=(
-            "Routes a free-text message to the right department: a decision model "
-            "classifies it and an LLM agent sends the e-mail through a tool call."
+            "Routes a free-text message to the right department by e-mail. ROUTER_MODE "
+            "selects who decides: an LLM agent with a send_email tool, or a decision model."
         ),
         version="0.1.0",
         lifespan=lifespan,

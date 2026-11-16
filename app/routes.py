@@ -30,8 +30,7 @@ async def route_message(body: MessageRequest, request: Request) -> RoutingRespon
     return RoutingResponse(
         recipient=state["sent_to"],
         decided_by=state["decided_by"],
-        suggested_department=state["suggestion"],
-        confidence=state["confidence"],
+        confidence=state.get("confidence"),
     )
 
 
@@ -48,13 +47,9 @@ async def health(request: Request, response: Response) -> HealthResponse:
     async def models() -> None:
         available = {model.model for model in (await state.ollama.list()).models}
         # Ollama lists an untagged name as name:latest.
-        wanted = {
-            name if ":" in name.rpartition("/")[2] else f"{name}:latest"
-            for name in (settings.agent_model, settings.decision_model)
-        }
-        missing = wanted - available
-        if missing:
-            raise RuntimeError(f"models not pulled: {', '.join(sorted(missing))}")
+        name = settings.model
+        if (name if ":" in name.rpartition("/")[2] else f"{name}:latest") not in available:
+            raise RuntimeError(f"model not pulled: {name}")
 
     def smtp() -> None:
         with mailer.connect(settings) as connection:

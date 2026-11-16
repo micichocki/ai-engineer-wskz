@@ -30,13 +30,11 @@ class MessageRequest(BaseModel):
 class RoutingResponse(BaseModel):
     recipient: Department = Field(description="Department mailbox the e-mail was sent to.")
     decided_by: Literal["decision_model", "agent"] = Field(
-        description=(
-            "'decision_model' when the agent followed a confident suggestion, "
-            "'agent' when it chose the department itself."
-        )
+        description="Which variant chose the department (set by ROUTER_MODE)."
     )
-    suggested_department: Department = Field(description="Decision model's suggestion.")
-    confidence: float = Field(description="Decision model's confidence in its suggestion.")
+    confidence: float | None = Field(
+        default=None, description="Decision model's confidence; null in agent mode."
+    )
 
 
 class Problem(BaseModel):
