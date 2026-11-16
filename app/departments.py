@@ -15,20 +15,26 @@ class Department(StrEnum):
 # model's criteria and in the agent prompt.
 DESCRIPTIONS: dict[Department, str] = {
     Department.HUMAN_RESOURCES: (
-        "Recruitment, onboarding, training, career development, performance reviews, "
-        "workplace conflicts and complaints about colleagues."
+        "People and their development: recruitment and candidates, onboarding, training and "
+        "courses, career, promotion and performance reviews, conflicts, complaints and "
+        "mistreatment at work."
     ),
     Department.HELP_DESK: (
-        "Something the employee uses is broken or not working: computer, printer, "
-        "password, e-mail, VPN, application errors."
+        "Something the employee already uses has stopped working or works badly: any device, "
+        "program, account, password or connection that is broken, blocked or failing."
     ),
     Department.IT: (
-        "Requests to IT administrators: new accounts and access rights, software and "
-        "hardware orders, servers, network and infrastructure changes."
+        "Something new or changed is needed from IT administrators: new accounts, access rights "
+        "and permissions, installing or buying software and hardware, changes to servers, "
+        "network or infrastructure."
     ),
     Department.KADRY: (
-        "Personnel administration: leave and vacation requests, sick leave, payroll, "
-        "employment contracts, certificates of employment."
+        "Formal employment paperwork and pay: any kind of leave or absence, salary, bonuses and "
+        "payslips, tax forms, contracts and their changes, personal data, certificates issued "
+        "by the employer."
     ),
-    Department.OTHER: "Anything that does not clearly belong to the other departments.",
+    Department.OTHER: (
+        "Anything that is not a matter for the four departments above, and text with no "
+        "clear request."
+    ),
 }
