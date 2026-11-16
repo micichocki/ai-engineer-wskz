@@ -1,4 +1,5 @@
-"""Edge cases from plan.md, run against the live stack: `python edge_cases.py [api] [mailhog]`.
+"""Edge cases (garbage input, injection, limits), run against the live stack:
+`python edge_cases.py [api] [mailhog]`.
 
 Prints what happened next to what was expected; it does not tune or retry anything.
 """

@@ -103,7 +103,7 @@ def build_graph(
         if isinstance(exc, MailDeliveryError):
             raise exc
         raise ModelError(
-            f"Agent model {settings.agent_model!r} made an invalid send_email call: {exc}"
+            f"Model {settings.model!r} made an invalid send_email call: {exc}"
         ) from exc
 
     graph = StateGraph(RouterState)

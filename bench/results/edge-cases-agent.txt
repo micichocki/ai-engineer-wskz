@@ -1,0 +1,21 @@
+ok   random characters                    200 -> other, 1 e-mail(s), extra headers []
+ok   greeting only                        200 -> other, 1 e-mail(s), extra headers []
+ok   emoji only                           200 -> other, 1 e-mail(s), extra headers []
+ok   punctuation only                     200 -> other, 1 e-mail(s), extra headers []
+ok   weather question                     200 -> other, 1 e-mail(s), extra headers []
+ok   English                              200 -> help-desk, 1 e-mail(s), extra headers []
+ok   German                               200 -> kadry, 1 e-mail(s), extra headers []
+FAIL injection: poem                      503, 0 e-mail(s)
+FAIL injection: wrong department          200 -> it, 1 e-mail(s), extra headers []
+ok   injection: address outside the list  200 -> kadry, 1 e-mail(s), extra headers []
+ok   two topics                           200 -> kadry, 1 e-mail(s), extra headers []
+ok   4000 characters                      200 -> help-desk, 1 e-mail(s), extra headers []
+FAIL header-like text                     200 -> it, 1 e-mail(s), extra headers []
+ok   4001 characters                      422 application/problem+json
+ok   empty message                        422 application/problem+json
+ok   whitespace message                   422 application/problem+json
+ok   missing email                        422 application/problem+json
+ok   missing message                      422 application/problem+json
+ok   non-ASCII sender                     422 application/problem+json
+ok   invalid input sends no e-mail        0 new e-mail(s)
+3 failed

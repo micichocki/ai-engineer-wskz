@@ -38,9 +38,10 @@ services:
   ollama:
     image: *ollama-image
     environment:
-      # Keep both models in memory so no request pays the load time.
+      # Keep the model in memory so no request pays the load time; one at a time, so
+      # switching modes unloads the other mode's model.
       OLLAMA_KEEP_ALIVE: "-1"
-      OLLAMA_MAX_LOADED_MODELS: "2"
+      OLLAMA_MAX_LOADED_MODELS: "1"
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:

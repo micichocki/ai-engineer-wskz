@@ -1,0 +1,2 @@
+api-1  | 2026-11-16 20:54:53,948 ERROR app.errors ModelError: Agent model 'qwen3:1.7b' made no send_email tool call. request_id=4a8158c2-1e66-4dbb-95c5-c69956ae8a9f
+api-1  | 2026-11-16 20:57:01,968 ERROR app.errors ModelError: Agent model 'qwen3:1.7b' made an invalid send_email call: Error invoking tool 'send_email' with kwargs {'to': 'training-and-courses@example.com'} with error:

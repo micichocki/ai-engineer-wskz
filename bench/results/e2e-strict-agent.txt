@@ -1,0 +1,8 @@
+..........F.FFFF....                                                     [100%]
+=========================== short test summary info ============================
+FAILED tests/test_e2e.py::test_message_reaches_the_right_department[Prosz\u0119 o zakup licencji na PhpStorm-it@example.com]
+FAILED tests/test_e2e.py::test_message_reaches_the_right_department[Chc\u0119 si\u0119 zapisa\u0107 na szkolenie z zarz\u0105dzania projektami-human-resources@example.com]
+FAILED tests/test_e2e.py::test_message_reaches_the_right_department[Mam konflikt z koleg\u0105 z zespo\u0142u i chc\u0119 to zg\u0142osi\u0107-human-resources@example.com]
+FAILED tests/test_e2e.py::test_message_reaches_the_right_department[Kiedy odb\u0119dzie si\u0119 moja ocena okresowa?-human-resources@example.com]
+FAILED tests/test_e2e.py::test_message_reaches_the_right_department[Chc\u0119 poleci\u0107 znajomego na stanowisko programisty-human-resources@example.com]
+5 failed, 15 passed, 38 deselected in 22.17s

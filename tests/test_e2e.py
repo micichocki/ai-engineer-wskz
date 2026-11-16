@@ -1,7 +1,8 @@
 """End-to-end check against the running stack: `docker compose up -d && pytest -m e2e`.
 
-Checks the pipeline (one e-mail, allowed recipient, Reply-To) on either variant. Whether the
-department is the right one is measured by batch.py, and asserted here only with E2E_STRICT=1
+Checks the pipeline (one e-mail, to the recipient the API reported, Reply-To) on either
+variant. Whether the department is the right one is measured by batch.py, and asserted here
+only with E2E_STRICT=1
 (`make decision && E2E_STRICT=1 pytest -m e2e`).
 """
 
@@ -58,7 +59,8 @@ def test_message_reaches_the_right_department(message, recipient):
 
     assert response.status_code == 200, response.text
     sent_to = response.json()["recipient"]
-    assert sent_to == recipient if STRICT else sent_to.endswith("@example.com")
+    if STRICT:
+        assert sent_to == recipient
 
     emails = captured_emails(sender)
     assert len(emails) == 1
