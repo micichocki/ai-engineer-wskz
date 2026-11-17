@@ -14,8 +14,6 @@ class MessageRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def _ascii_only(cls, value: str) -> str:
-        # shortcut: the mailer sends plain ASCII headers, so SMTPUTF8/IDN addresses are
-        # rejected; switch to an SMTPUTF8 session if such senders must be supported.
         if not value.isascii():
             raise ValueError("non-ASCII e-mail addresses are not supported")
         return value

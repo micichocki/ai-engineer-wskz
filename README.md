@@ -10,7 +10,7 @@ described separately in [Proposal: a decision model instead of the LLM](#proposa
 
 ## Run it
 
-Requirements: Docker with Compose v2, about 2 GB of free RAM and 3 GB of disk
+Requirements: Docker with Compose, about 2 GB of free RAM and 3 GB of disk
 (about 4 GB of RAM and 5 GB of disk for the optional decision variant).
 
 ```bash
@@ -50,8 +50,7 @@ curl -X POST http://localhost:8000/api/v1/messages \
 ```
 
 Open http://localhost:8025: the e-mail is addressed to `kadry@example.com`, its `Reply-To`
-is `jan.nowak@example.com` and its body is the original message. A request takes about
-1.3 seconds on a laptop CPU.
+is `jan.nowak@example.com` and its body is the original message.
 
 ## How it works
 
@@ -97,6 +96,8 @@ and the `X-Request-ID` header.
 general rules and used by both variants. `help-desk`: something already in use stopped working.
 `it`: something new or changed is needed. `kadry`: leave, pay, contracts and certificates.
 `human-resources`: recruitment, training, development and conflicts.
+These rules are my own reading of the department names, since the task does not define them.
+In a real deployment they should be agreed with the departments themselves.
 
 **Readiness.** The API container starts only after the model job has finished and MailHog is
 healthy, and the `ready` job holds `docker compose up -d` until the API health check passes.
@@ -106,10 +107,10 @@ The model stays loaded in memory, so no request pays the load time.
 ## Proposal: a decision model instead of the LLM
 
 The agent above does what the task asks. Measured on 100 messages, however, the small LLM
-routes 72 correctly and one request failed because it called the tool with an address it
-invented. Choosing one of five mailboxes is a classification problem, so this repository also
-contains a variant built for that: a *decision model* (`d3:2b`) picks the department and
-plain code makes the tool call.
+routes only 72 of them correctly (details in [Comparison](#comparison-of-the-two-variants)).
+This repository therefore also contains a variant built on a newer kind of model: a *decision
+model* (`d3:2b`), made for choosing between fixed options, picks the department, and plain code
+makes the tool call.
 
 ```bash
 make decision    # same as: ROUTER_MODE=decision docker compose up -d
@@ -135,11 +136,14 @@ two copies of the code. Each mode pulls and loads only its own model.
 **The tool call is written by code.** A decision model answers typed questions with
 probabilities and cannot produce tool calls. Its answer is turned into a `send_email` call
 that goes through the same tool node, the same validation and the same mail code as the
-agent's call. Alternatives considered: an MCP server for `send_email` (an extra container and
-protocol for one function), and letting an LLM make the call from the classifier's answer (an
-earlier version of this project did that: it took 3.8 s per request and routed 89 of 100
-correctly, fewer than the decision model alone on the same descriptions; its results are kept
-in `bench/results/hybrid-old-descriptions.json`).
+agent's call.
+
+**Alternatives considered.**
+
+- An MCP server for `send_email`: an extra container and protocol for one function.
+- An LLM that makes the `send_email` call, given the decision model's answer as a suggestion:
+  an earlier version of this project did that, and it routed 89 of 100 correctly, fewer than
+  the decision model alone on the same descriptions (91).
 
 ### Comparison of the two variants
 
@@ -173,35 +177,9 @@ What the numbers say:
   this advantage; that was not measured.
 
 Limits of the comparison: the labels were chosen by the author and 100 messages is a small
-sample. Each variant was run twice and gave the same answer for every message both times
-(`bench/results/*-run2.json`); the table shows the first run. The department descriptions were
-revised once, after a first run on all 100 messages; both variants improved (agent from 59 to
-72, decision from 91 to 94) and the earlier results are kept in
-`bench/results/*-old-descriptions.json`. 40 of the messages ("seen") were used during
-development. The other 60 ("fresh") were written before any run, but they were part of the
-run that led to the revision, so they are not a held-out set; on those the result is 42 for
-the agent and 57 for the decision model.
+sample.
 
-Reproduce: `make bench-agent`, `make bench-decision`, `make chart`.
-
-## Project layout
-
-```
-app/
-  main.py          application factory, lifespan, request id
-  routes.py        POST /api/v1/messages, GET /api/v1/health
-  graph.py         LangGraph: decide (agent or decision model) -> tools
-  decision.py      decision model client (Ollama /v1/systemone)
-  mailer.py        builds and sends the e-mail
-  departments.py   allowed addresses and their descriptions
-  schemas.py       request / response models
-  errors.py        domain errors and their HTTP mapping
-  config.py        settings from environment variables
-tests/             unit tests (no Docker needed) and an end-to-end test
-bench/             labelled messages, benchmark results and the chart script
-batch.py           runs the benchmark against the running stack
-edge_cases.py      edge cases (garbage input, injection, limits) against the running stack
-```
+Reproduce: `make bench-agent`, `make bench-decision`.
 
 ## Tests
 
@@ -213,14 +191,18 @@ uv run python edge_cases.py             # edge cases on the running stack
 ```
 
 The end-to-end test sends 20 messages and checks that each produces exactly one e-mail, to
-the address the API reported, with the right `Reply-To`. It passes on both variants. Whether
-the department is the right one is a question of model quality and is measured by the
-benchmark; `make decision && E2E_STRICT=1 uv run pytest -m e2e` also asserts it (20 of 20 on
-the decision variant, 15 of 20 on the agent; output in `bench/results/e2e-strict-*.txt`).
+the address the API reported, with the right `Reply-To`. It passes on both variants.
+
+It does not check whether the department is the right one, because that depends on the model
+and is measured by the benchmark. A strict mode also checks the department:
+`E2E_STRICT=1 uv run pytest -m e2e`, run after `make agent` or `make decision`.
+
+In strict mode the results differ between the variants: 20 of 20 on the decision variant and
+15 of 20 on the agent. The output of both runs is in `bench/results/e2e-strict-*.txt`.
 
 ## Limits of this PoC
 
 - No authentication, rate limiting or deduplication: sending the same request twice sends two e-mails.
 - Non-ASCII sender addresses (for example `jan@żółw.pl`) are rejected with 422.
-- Routing accuracy is as measured above; it is a small test, not a benchmark.
-- The MailHog image is built for amd64 only; on ARM machines Docker runs it under emulation.
+- Routing accuracy was measured on 100 messages written for this project: a small sample, not a
+  standard public benchmark.

@@ -11,8 +11,6 @@ class Department(StrEnum):
     OTHER = "other@example.com"
 
 
-# Single source of truth for what each department handles: used as the decision
-# model's criteria and in the agent prompt.
 DESCRIPTIONS: dict[Department, str] = {
     Department.HUMAN_RESOURCES: (
         "People and their development: recruitment and candidates, onboarding, training and "

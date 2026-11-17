@@ -1,5 +1,4 @@
-# Mode and model names are set once here and shared by the API and the model-pull job.
-# ROUTER_MODE: agent (LLM tool call, the default) or decision (decision model, no LLM).
+
 x-models: &models
   ROUTER_MODE: ${ROUTER_MODE:-agent}
   AGENT_MODEL: ${AGENT_MODEL:-qwen3:1.7b}
@@ -38,8 +37,6 @@ services:
   ollama:
     image: *ollama-image
     environment:
-      # Keep the model in memory so no request pays the load time; one at a time, so
-      # switching modes unloads the other mode's model.
       OLLAMA_KEEP_ALIVE: "-1"
       OLLAMA_MAX_LOADED_MODELS: "1"
     volumes:
@@ -51,8 +48,6 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # One-shot job: downloads the selected mode's model (first start only) and loads it.
-  # The API waits for it, so `docker compose up -d` returns with the stack ready.
   ollama-init:
     image: *ollama-image
     environment:
@@ -73,7 +68,6 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # One-shot gate: `docker compose up -d` returns only after the API reports healthy.
   ready:
     image: *ollama-image
     entrypoint: ["/bin/true"]
@@ -85,7 +79,7 @@ services:
   mailhog:
     image: mailhog/mailhog:v1.0.1
     ports:
-      - "${MAILHOG_PORT:-8025}:8025" # web UI and API; SMTP (1025) stays internal
+      - "${MAILHOG_PORT:-8025}:8025"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025"]
       interval: 5s

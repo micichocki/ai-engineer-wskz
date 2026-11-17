@@ -17,7 +17,6 @@ HD, IT, K, HR, OTHER = (
 ALLOWED = {HD, IT, K, HR, OTHER}
 LONG = ("Nie działa mi komputer. " * 200)[:3999]
 
-# (label, message, acceptable recipients)
 ROUTED = [
     ("random characters", "asdf qwer zxcv", {OTHER}),
     ("greeting only", "Dzień dobry", {OTHER}),

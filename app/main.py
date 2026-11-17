@@ -24,16 +24,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         model=settings.agent_model,
         base_url=settings.ollama_base_url,
         temperature=0,
-        num_predict=128,  # a send_email call is ~30 tokens; stops a model stuck repeating itself
-        reasoning=False,  # one enum argument needs no thinking; keeps CPU latency low
+        num_predict=128,
+        reasoning=False,
         client_kwargs={"timeout": settings.model_timeout_seconds},
     )
+    decision_model = OllamaDecisionModel(ollama_client, settings.decision_model)
 
     app.state.settings = settings
     app.state.ollama = ollama_client
-    app.state.graph = build_graph(
-        settings, chat_model, OllamaDecisionModel(ollama_client, settings.decision_model)
-    )
+    app.state.graph = build_graph(settings, chat_model, decision_model)
     try:
         yield
     finally:

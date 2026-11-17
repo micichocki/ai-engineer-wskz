@@ -25,7 +25,7 @@ _ERRORS = {
     },
 )
 async def route_message(body: MessageRequest, request: Request) -> RoutingResponse:
-    """The agent picks the department and forwards the message by e-mail."""
+    """The router picks the department and forwards the message by e-mail."""
     state = await request.app.state.graph.ainvoke({"email": body.email, "message": body.message})
     return RoutingResponse(
         recipient=state["sent_to"],
