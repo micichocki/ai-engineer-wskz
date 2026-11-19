@@ -18,7 +18,7 @@ git clone https://github.com/micichocki/ai-engineer-wskz.git && cd ai-engineer-w
 docker compose up -d
 ```
 
-The first start downloads the model weights (1.4 GB), so it takes a few minutes. The command
+The first start downloads the model weights, so it takes a few minutes. The command
 returns once the model is downloaded and loaded and the API reports healthy, so the stack
 accepts requests as soon as you get the prompt back.
 
@@ -30,7 +30,7 @@ accepts requests as soon as you get the prompt back.
 | Health of dependencies | http://localhost:8000/api/v1/health |
 
 Optional settings (models, ports) are listed in [.env.example](.env.example).
-With an NVIDIA GPU and the NVIDIA Container Toolkit:
+With an NVIDIA GPU and the NVIDIA Container Toolkit you can run:
 `docker compose -f docker-compose.yml -f compose.gpu.yaml up -d`.
 
 ## Try it
@@ -101,8 +101,6 @@ In a real deployment they should be agreed with the departments themselves.
 
 **Readiness.** The API container starts only after the model job has finished and MailHog is
 healthy, and the `ready` job holds `docker compose up -d` until the API health check passes.
-A cold start with the model download was measured at under two minutes on a fast connection.
-The model stays loaded in memory, so no request pays the load time.
 
 ## Proposal: a decision model instead of the LLM
 
@@ -117,7 +115,7 @@ make decision    # same as: ROUTER_MODE=decision docker compose up -d
 make agent       # back to the agent; same as: docker compose up -d
 ```
 
-Each command pulls the model if needed (3.2 GB for `d3:2b`) and waits until the API is healthy.
+Each command pulls the model if needed and waits until the API is healthy.
 The API, the request and the response are the same; `decided_by` becomes `decision_model` and
 `confidence` holds the model's probability for its choice; it is reported only and does not
 change the routing.
@@ -151,14 +149,14 @@ Both variants were run on the same 100 labelled messages
 ([bench/messages.csv](bench/messages.csv), 20 per department, mostly Polish), on a
 laptop CPU (Ryzen 5 4600H, no GPU). Raw results are in [bench/results/](bench/results).
 
-![Routing accuracy and latency of both variants](bench/results.png)
+![Routing accuracy of both variants](bench/results.png)
 
 | | agent (`qwen3:1.7b`) | decision (`d3:2b`) |
 |---|---|---|
 | Routed to the right department | 72 of 100 | **94 of 100** |
 | Requests that failed with 503 | 1 of 100 | **0 of 100** |
 | Edge cases passed ([edge_cases.py](edge_cases.py), output in `bench/results/edge-cases-*.txt`) | 17 of 20 | **20 of 20** |
-| Median time per request | **1.3 s** | 2.9 s |
+| Median time per request | **1.1 s** | 2.3 s |
 | Model size on disk / in RAM | **1.4 GB / 1.9 GB** | 3.2 GB / 3.7 GB |
 
 What the numbers say:
@@ -187,7 +185,7 @@ Reproduce: `make bench-agent`, `make bench-decision`.
 uv sync
 make test                               # ruff and unit tests; models and services are faked
 uv run pytest -m e2e                    # end-to-end on the running stack, either variant
-uv run python edge_cases.py             # edge cases on the running stack
+uv run python edge_cases.py             # edge cases on the running stack, either variant
 ```
 
 The end-to-end test sends 20 messages and checks that each produces exactly one e-mail, to
