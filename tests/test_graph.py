@@ -148,3 +148,16 @@ async def test_agent_call_has_a_total_time_limit(outbox):
     with pytest.raises(ModelError):
         await graph.ainvoke(REQUEST)
     assert outbox == []
+
+
+async def test_decision_call_has_a_total_time_limit(outbox):
+    class SlowDecisionModel(FakeDecisionModel):
+        async def classify(self, message: str) -> Decision:
+            await asyncio.sleep(5)
+
+    settings = Settings(_env_file=None, router_mode="decision", model_timeout_seconds=0.01)
+    graph = build_graph(settings, FakeChatModel(responses=[]), SlowDecisionModel(UNUSED))
+
+    with pytest.raises(ModelError, match="timed out"):
+        await graph.ainvoke(REQUEST)
+    assert outbox == []

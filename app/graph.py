@@ -68,7 +68,11 @@ def build_graph(
     agent_model = chat_model.bind_tools([send_email])
 
     async def classify(state: RouterState) -> RouterState:
-        decision = await decision_model.classify(state["message"])
+        try:
+            async with asyncio.timeout(settings.model_timeout_seconds):
+                decision = await decision_model.classify(state["message"])
+        except TimeoutError as exc:
+            raise ModelError(f"Decision model {settings.decision_model!r} timed out.") from exc
         call = {
             "name": send_email.name,
             "args": {"to": decision.department.value},
