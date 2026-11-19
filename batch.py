@@ -36,7 +36,5 @@ with (BENCH / "messages.csv").open(encoding="utf-8") as f, httpx.Client(timeout=
 (BENCH / "results" / f"{label}.json").write_text(
     json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8"
 )
-for name in ("seen", "fresh"):
-    part = [row for row in rows if row["set"] == name]
-    print(f"{name}: {sum(row['got'] == row['expected'] for row in part)} of {len(part)} correct")
+print(f"{sum(row['got'] == row['expected'] for row in rows)} of {len(rows)} correct")
 print(f"median {sorted(row['seconds'] for row in rows)[len(rows) // 2]} s")

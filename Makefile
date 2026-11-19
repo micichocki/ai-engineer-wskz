@@ -1,10 +1,10 @@
 # Two variants of the router share one image; ROUTER_MODE selects the variant.
 .PHONY: agent decision bench-agent bench-decision test down
 
-agent: ## LLM agent picks the department and calls send_email (the task as specified)
+agent:
 	ROUTER_MODE=agent docker compose up -d --build
 
-decision: ## decision model picks the department, code makes the same call (no LLM)
+decision:
 	ROUTER_MODE=decision docker compose up -d --build
 
 bench-agent: agent

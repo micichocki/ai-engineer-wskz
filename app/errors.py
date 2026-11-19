@@ -15,7 +15,6 @@ class AppError(Exception):
     """Base for failures we report to the client with a specific HTTP status."""
 
     status = HTTPStatus.INTERNAL_SERVER_ERROR
-    # Sent to the client; the exception message (hosts, library errors) is only logged.
     detail = "Unexpected server error."
 
 
